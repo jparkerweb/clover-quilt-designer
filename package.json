@@ -1,0 +1,13 @@
+{
+	"name": "clover-quilt-designer",
+	"version": "1.0.0",
+	"description": "A simple web server for clover-quilt-designer.",
+	"main": "server.js",
+	"type": "module",
+	"scripts": {
+		"start": "node server.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC"
+} 

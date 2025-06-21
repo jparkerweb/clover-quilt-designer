@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍀 Clover Quilt Designer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>🍀 Clover Quilt Designer</h1>
+            <div class="toolbar">
+                <div class="color-section">
+                    <label>Colors:</label>
+                    <div class="color-palette" id="colorPalette">
+                        <!-- 10 customizable color blocks will be generated here -->
+                    </div>
+                    <button class="color-picker-btn" id="colorPickerBtn">change selected color</button>
+                    <input type="color" id="hiddenColorPicker" style="display: none;">
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="resetBtn" title="Clear All (Ctrl+R)">🗑️ Reset</button>
+                    <button id="exportBtn" title="Export PNG (Ctrl+S)">📥 Export</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div class="pattern-container" id="patternContainer">
+                <div class="loading-indicator" id="loadingIndicator">
+                    Loading pattern...
+                </div>
+                <div class="pattern-wrapper" id="patternWrapper">
+                    <!-- SVG will be loaded here -->
+                </div>
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="status-info">
+                <span id="statusText">Ready to design</span>
+                <span id="shapeCount">Shapes: 0/625</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Hidden canvas for export -->
+    <canvas id="exportCanvas" style="display: none;"></canvas>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html> 
