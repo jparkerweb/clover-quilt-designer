@@ -2,7 +2,7 @@
  * Main Application - Orchestrates all components and handles initialization
  */
 import { PatternRenderer } from './pattern-renderer.js';
-import { ColorManager } from './color-manager.js';
+import { FillManager } from './fill-manager.js';
 
 class CloverQuiltApp {
     constructor() {
@@ -12,7 +12,7 @@ class CloverQuiltApp {
         this.state = {
             totalShapes: 0,
             filledShapes: 0,
-            currentColor: '#FF0000',
+            currentFill: null,
             isLoading: false
         };
         
@@ -25,7 +25,7 @@ class CloverQuiltApp {
     async initialize() {
         try {
             this.cacheElements();
-            this.setupComponents();
+            await this.setupComponents();
             await this.loadPattern();
             this.setupEventListeners();
             this.updateUI();
@@ -48,10 +48,26 @@ class CloverQuiltApp {
             patternWrapper: document.getElementById('patternWrapper'),
             loadingIndicator: document.getElementById('loadingIndicator'),
             
-            // Color controls
+            // Fill controls
             colorPalette: document.getElementById('colorPalette'),
+            patternGallery: document.getElementById('patternGallery'),
+            colorSection: document.getElementById('colorSection'),
+            patternSection: document.getElementById('patternSection'),
+            colorModeBtn: document.getElementById('colorModeBtn'),
+            patternModeBtn: document.getElementById('patternModeBtn'),
+            colorPickerBtn: document.getElementById('colorPickerBtn'),
+            hiddenColorPicker: document.getElementById('hiddenColorPicker'),
+            uploadPatternBtn: document.getElementById('uploadPatternBtn'),
+            hiddenFileInput: document.getElementById('hiddenFileInput'),
+            clearPatternsBtn: document.getElementById('clearPatternsBtn'),
+            zoomSlider: document.getElementById('zoomSlider'),
+            
+            // Stroke controls
+            strokeColorPicker: document.getElementById('strokeColorPicker'),
+            canvasColorPicker: document.getElementById('canvasColorPicker'),
             
             // Action buttons
+            fullscreenBtn: document.getElementById('fullscreenBtn'),
             resetBtn: document.getElementById('resetBtn'),
             exportBtn: document.getElementById('exportBtn'),
             
@@ -60,8 +76,15 @@ class CloverQuiltApp {
             shapeCount: document.getElementById('shapeCount'),
             
             // Export canvas
-            exportCanvas: document.getElementById('exportCanvas')
+            exportCanvas: document.getElementById('exportCanvas'),
+            
+            // Fullscreen elements
+            fullscreenOverlay: document.getElementById('fullscreenOverlay'),
+            fullscreenSvgContainer: document.getElementById('fullscreenSvgContainer'),
+            exitFullscreenBtn: document.getElementById('exitFullscreenBtn')
         };
+
+
 
         // Validate required elements
         const requiredElements = ['patternWrapper', 'colorPalette', 'loadingIndicator'];
@@ -75,7 +98,7 @@ class CloverQuiltApp {
     /**
      * Setup component instances
      */
-    setupComponents() {
+    async setupComponents() {
         // Initialize PatternRenderer
         this.components.patternRenderer = new PatternRenderer(this.elements.patternWrapper, {
             hoverEffects: true
@@ -86,13 +109,49 @@ class CloverQuiltApp {
             this.handleShapeClick(pathId, currentColor, event);
         });
 
-        // Initialize ColorManager
-        this.components.colorManager = new ColorManager(this.elements.colorPalette, {
-            onColorChange: (color) => this.handleColorChange(color)
+        // Initialize FillManager
+        const fillContainers = {
+            colorPalette: this.elements.colorPalette,
+            patternGallery: this.elements.patternGallery,
+            colorSection: this.elements.colorSection,
+            patternSection: this.elements.patternSection,
+            colorModeBtn: this.elements.colorModeBtn,
+            patternModeBtn: this.elements.patternModeBtn,
+            colorPickerBtn: this.elements.colorPickerBtn,
+            hiddenColorPicker: this.elements.hiddenColorPicker,
+            uploadPatternBtn: this.elements.uploadPatternBtn,
+            hiddenFileInput: this.elements.hiddenFileInput,
+            clearPatternsBtn: this.elements.clearPatternsBtn,
+            zoomSlider: this.elements.zoomSlider
+        };
+
+        this.components.fillManager = new FillManager(fillContainers, {
+            onFillChange: (fill) => this.handleFillChange(fill),
+            onModeChange: (mode) => this.handleModeChange(mode),
+            onTileSizeChange: (tileSize) => this.handleTileSizeChange(tileSize)
         });
 
-        // Set initial color
-        this.state.currentColor = this.components.colorManager.getCurrentColor();
+        // Wait for default patterns to load if needed
+        await this.components.fillManager.waitForInitialization();
+
+        // Set up pattern data callback for renderer
+        this.components.patternRenderer.setPatternDataCallback((patternId) => {
+            return this.components.fillManager.getPattern(patternId);
+        });
+
+        // Set up tile size callback for renderer
+        this.components.patternRenderer.setTileSizeCallback(() => {
+            return this.components.fillManager.getCurrentTileSize();
+        });
+
+        // Set initial fill
+        this.state.currentFill = this.components.fillManager.getCurrentFill();
+        
+        // Load and set initial stroke color
+        this.loadStrokeColor();
+        
+        // Load and set initial canvas color
+        this.loadCanvasColor();
     }
 
     /**
@@ -105,6 +164,24 @@ class CloverQuiltApp {
         try {
             const shapeCount = await this.components.patternRenderer.loadPattern('./Clover-Quilt-Outline.svg');
             this.state.totalShapes = shapeCount;
+            
+            // Apply saved colors after SVG loads
+            const savedStrokeColor = localStorage.getItem('clover-quilt-stroke-color') || '#000000';
+            const savedCanvasColor = localStorage.getItem('clover-quilt-canvas-color') || '#FFFFFF';
+            
+            // Force a slight delay to ensure SVG is fully rendered
+            setTimeout(() => {
+                this.components.patternRenderer.updateStrokeColor(savedStrokeColor);
+                this.components.patternRenderer.updateCanvasColor(savedCanvasColor);
+            }, 100);
+            
+            if (this.elements.strokeColorPicker) {
+                this.elements.strokeColorPicker.value = savedStrokeColor;
+            }
+            if (this.elements.canvasColorPicker) {
+                this.elements.canvasColorPicker.value = savedCanvasColor;
+            }
+            
             this.updateStatus('Pattern loaded successfully');
         } catch (error) {
             console.error('Pattern loading failed:', error);
@@ -139,6 +216,37 @@ class CloverQuiltApp {
             this.elements.exportBtn.addEventListener('click', () => this.handleExport());
         }
 
+        // Stroke color picker
+        if (this.elements.strokeColorPicker) {
+            this.elements.strokeColorPicker.addEventListener('change', (event) => {
+                this.handleStrokeColorChange(event.target.value);
+            });
+        }
+
+        // Canvas color picker
+        if (this.elements.canvasColorPicker) {
+            this.elements.canvasColorPicker.addEventListener('change', (event) => {
+                this.handleCanvasColorChange(event.target.value);
+            });
+        }
+
+        // Fullscreen button
+        if (this.elements.fullscreenBtn) {
+            this.elements.fullscreenBtn.addEventListener('click', () => this.handleFullscreen());
+        }
+
+        // Exit fullscreen button
+        if (this.elements.exitFullscreenBtn) {
+            this.elements.exitFullscreenBtn.addEventListener('click', () => this.exitFullscreen());
+        }
+
+        // ESC key to exit fullscreen
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.isFullscreenActive()) {
+                this.exitFullscreen();
+            }
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (event) => this.handleKeyboardShortcut(event));
 
@@ -152,26 +260,71 @@ class CloverQuiltApp {
     handleShapeClick(pathId, currentColor, event) {
         if (!this.isInitialized || this.state.isLoading) return;
         
-        const newColor = this.state.currentColor;
-        const previousColor = this.components.patternRenderer.fillShape(pathId, newColor);
+        const currentFill = this.state.currentFill;
+        if (!currentFill) return;
         
-        if (previousColor !== null) {
+        const previousFill = this.components.patternRenderer.fillShape(pathId, currentFill);
+        
+        if (previousFill !== false) {
             // Update filled shapes count
             this.state.filledShapes = this.components.patternRenderer.getFilledShapesCount();
             this.updateUI();
             
-
-            
-            this.updateStatus(`Filled shape with ${newColor}`);
+            const fillDescription = currentFill.type === 'color' ? 
+                `color ${currentFill.value}` : 
+                `pattern`;
+            this.updateStatus(`Filled shape with ${fillDescription}`);
         }
     }
 
     /**
-     * Handle color change
+     * Handle fill change
      */
-    handleColorChange(color) {
-        this.state.currentColor = color;
-        this.updateStatus(`Color changed to ${color}`);
+    handleFillChange(fill) {
+        this.state.currentFill = fill;
+        if (fill) {
+            const fillDescription = fill.type === 'color' ? 
+                `color ${fill.value}` : 
+                `pattern`;
+            this.updateStatus(`Selected ${fillDescription}`);
+        }
+    }
+
+    /**
+     * Handle mode change
+     */
+    handleModeChange(mode) {
+        this.updateStatus(`Switched to ${mode} mode`);
+    }
+
+    /**
+     * Handle tile size change
+     */
+    handleTileSizeChange(tileSize) {
+        this.components.patternRenderer.updateAllPatternSizes(tileSize);
+        this.updateStatus(`Pattern tile size: ${tileSize}px`);
+    }
+
+    /**
+     * Handle stroke color change
+     */
+    handleStrokeColorChange(color) {
+        if (!this.isInitialized) return;
+        
+        this.components.patternRenderer.updateStrokeColor(color);
+        this.saveStrokeColor(color);
+        this.updateStatus(`Outline color changed to ${color}`);
+    }
+
+    /**
+     * Handle canvas color change
+     */
+    handleCanvasColorChange(color) {
+        if (!this.isInitialized) return;
+        
+        this.components.patternRenderer.updateCanvasColor(color);
+        this.saveCanvasColor(color);
+        this.updateStatus(`Canvas color changed to ${color}`);
     }
 
 
@@ -296,6 +449,17 @@ class CloverQuiltApp {
     handleKeyboardShortcut(event) {
         if (!this.isInitialized) return;
         
+        // Handle F11 for fullscreen
+        if (event.key === 'F11') {
+            event.preventDefault();
+            if (this.isFullscreenActive()) {
+                this.exitFullscreen();
+            } else {
+                this.handleFullscreen();
+            }
+            return;
+        }
+
         // Prevent default browser shortcuts
         if (event.ctrlKey || event.metaKey) {
             switch (event.key.toLowerCase()) {
@@ -384,6 +548,134 @@ class CloverQuiltApp {
             shapes: this.components.patternRenderer ? this.components.patternRenderer.getAllShapes() : {},
             palette: this.components.colorManager ? this.components.colorManager.getPalette() : []
         };
+    }
+
+    /**
+     * Load stroke color from localStorage
+     */
+    loadStrokeColor() {
+        try {
+            const saved = localStorage.getItem('clover-quilt-stroke-color');
+            const strokeColor = saved || '#000000';
+            
+            // Set the color picker value
+            if (this.elements.strokeColorPicker) {
+                this.elements.strokeColorPicker.value = strokeColor;
+            }
+            
+            // Apply the stroke color to the SVG (after it's loaded)
+            if (this.components.patternRenderer && this.components.patternRenderer.isPatternLoaded()) {
+                this.components.patternRenderer.updateStrokeColor(strokeColor);
+            }
+            
+            this.state.strokeColor = strokeColor;
+        } catch (error) {
+            console.warn('Failed to load stroke color:', error);
+        }
+    }
+
+    /**
+     * Save stroke color to localStorage
+     */
+    saveStrokeColor(color) {
+        try {
+            localStorage.setItem('clover-quilt-stroke-color', color);
+            this.state.strokeColor = color;
+        } catch (error) {
+            console.warn('Failed to save stroke color:', error);
+        }
+    }
+
+    /**
+     * Load canvas color from localStorage
+     */
+    loadCanvasColor() {
+        try {
+            const saved = localStorage.getItem('clover-quilt-canvas-color');
+            const canvasColor = saved || '#FFFFFF';
+            
+            // Set the color picker value
+            if (this.elements.canvasColorPicker) {
+                this.elements.canvasColorPicker.value = canvasColor;
+            }
+            
+            // Apply the canvas color to the SVG (after it's loaded)
+            if (this.components.patternRenderer && this.components.patternRenderer.isPatternLoaded()) {
+                this.components.patternRenderer.updateCanvasColor(canvasColor);
+            }
+            
+            this.state.canvasColor = canvasColor;
+        } catch (error) {
+            console.warn('Failed to load canvas color:', error);
+        }
+    }
+
+    /**
+     * Save canvas color to localStorage
+     */
+    saveCanvasColor(color) {
+        try {
+            localStorage.setItem('clover-quilt-canvas-color', color);
+            this.state.canvasColor = color;
+        } catch (error) {
+            console.warn('Failed to save canvas color:', error);
+        }
+    }
+
+    /**
+     * Handle fullscreen mode
+     */
+    handleFullscreen() {
+        if (!this.isInitialized || !this.components.patternRenderer.isPatternLoaded()) {
+            this.updateStatus('No pattern loaded to view in fullscreen');
+            return;
+        }
+
+        const svgElement = this.components.patternRenderer.getSVGElement();
+        if (!svgElement) {
+            this.updateStatus('SVG not available for fullscreen');
+            return;
+        }
+
+        // Clone the SVG to avoid affecting the original
+        const svgClone = svgElement.cloneNode(true);
+        
+        // Clear any existing content
+        this.elements.fullscreenSvgContainer.innerHTML = '';
+        
+        // Add the cloned SVG to fullscreen container
+        this.elements.fullscreenSvgContainer.appendChild(svgClone);
+        
+        // Show the fullscreen overlay
+        this.elements.fullscreenOverlay.classList.add('active');
+        
+        // Prevent body scrolling
+        document.body.style.overflow = 'hidden';
+        
+        this.updateStatus('Entered fullscreen view');
+    }
+
+    /**
+     * Exit fullscreen mode
+     */
+    exitFullscreen() {
+        // Hide the fullscreen overlay
+        this.elements.fullscreenOverlay.classList.remove('active');
+        
+        // Restore body scrolling
+        document.body.style.overflow = '';
+        
+        // Clear the fullscreen container
+        this.elements.fullscreenSvgContainer.innerHTML = '';
+        
+        this.updateStatus('Exited fullscreen view');
+    }
+
+    /**
+     * Check if fullscreen is currently active
+     */
+    isFullscreenActive() {
+        return this.elements.fullscreenOverlay.classList.contains('active');
     }
 }
 

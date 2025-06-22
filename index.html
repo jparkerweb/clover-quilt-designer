@@ -11,16 +11,48 @@
         <header class="app-header">
             <h1>🍀 Clover Quilt Designer</h1>
             <div class="toolbar">
-                <div class="color-section">
-                    <label>Colors:</label>
-                    <div class="color-palette" id="colorPalette">
-                        <!-- 10 customizable color blocks will be generated here -->
+                <div class="fill-section">
+                    <div class="fill-mode-toggle">
+                        <button class="mode-btn active" id="colorModeBtn" data-mode="color">🎨 Colors</button>
+                        <button class="mode-btn" id="patternModeBtn" data-mode="pattern">🖼️ Patterns</button>
                     </div>
-                    <button class="color-picker-btn" id="colorPickerBtn">change selected color</button>
-                    <input type="color" id="hiddenColorPicker" style="display: none;">
+                    
+                    <div class="color-section" id="colorSection">
+                        <div class="color-palette" id="colorPalette">
+                            <!-- 10 customizable color blocks will be generated here -->
+                        </div>
+                        <button class="color-picker-btn" id="colorPickerBtn">change selected color</button>
+                        <input type="color" id="hiddenColorPicker" style="display: none;">
+                    </div>
+                    
+                    <div class="pattern-section hidden" id="patternSection">
+                        <div class="pattern-row">
+                            <div class="pattern-gallery" id="patternGallery">
+                                <!-- Pattern thumbnails will be generated here -->
+                            </div>
+                            <div class="pattern-zoom-controls">
+                                <input type="range" id="zoomSlider" min="0" max="9" value="4" step="1" 
+                                       title="Adjust pattern scale" class="zoom-slider">
+                            </div>
+                            <div class="pattern-controls">
+                                <button class="upload-btn" id="uploadPatternBtn">📁 Upload Image</button>
+                                <input type="file" id="hiddenFileInput" accept="image/*" style="display: none;">
+                                <button class="clear-patterns-btn" id="clearPatternsBtn">🗑️ Clear All</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stroke-controls">
+                    <label for="strokeColorPicker" class="stroke-label">Outline Color:</label>
+                    <input type="color" id="strokeColorPicker" value="#000000" title="Change outline color">
+                    
+                    <label for="canvasColorPicker" class="canvas-label">Canvas Color:</label>
+                    <input type="color" id="canvasColorPicker" value="#FFFFFF" title="Change default fill color">
                 </div>
                 
                 <div class="action-buttons">
+                    <button id="fullscreenBtn" title="Fullscreen View (F11)">🔍 Fullscreen</button>
                     <button id="resetBtn" title="Clear All (Ctrl+R)">🗑️ Reset</button>
                     <button id="exportBtn" title="Export PNG (Ctrl+S)">📥 Export</button>
                 </div>
@@ -48,6 +80,18 @@
 
     <!-- Hidden canvas for export -->
     <canvas id="exportCanvas" style="display: none;"></canvas>
+
+    <!-- Fullscreen overlay -->
+    <div class="fullscreen-overlay" id="fullscreenOverlay">
+        <div class="fullscreen-content">
+            <div class="fullscreen-controls">
+                <button class="fullscreen-btn" id="exitFullscreenBtn">✕ Exit Fullscreen</button>
+            </div>
+            <div class="fullscreen-svg-container" id="fullscreenSvgContainer">
+                <!-- SVG will be cloned here -->
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="js/main.js"></script>
 </body>
