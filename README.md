@@ -55,15 +55,15 @@ cd clover-quilt-designer
 # Start the server
 node server.js
 
-# Open your browser to http://localhost:3000
+# Open your browser to http://localhost:7777
 ```
 
 ### Option 2: Python HTTP Server
 ```bash
 # In the project directory
-python -m http.server 8000
+python -m http.server 7777
 
-# Open your browser to http://localhost:8000
+# Open your browser to http://localhost:7777
 ```
 
 ### Option 3: Any Static Web Server
